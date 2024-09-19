@@ -1,4 +1,5 @@
-﻿using API.Data;
+﻿using System.Security.Claims;
+using API.Data;
 using API.DTOs;
 using API.Interfaces;
 using AutoMapper;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace API;
 
 [Authorize]
-public class UsersController(IUserRepository userRepository) : BaseApiController
+public class UsersController(IUserRepository userRepository, IMapper mapper) : BaseApiController
 {
     [HttpGet]
     public async Task<ActionResult<IEnumerable<MemberDto>>> GetUsers()
@@ -26,11 +27,28 @@ public class UsersController(IUserRepository userRepository) : BaseApiController
         return user;     
     }
 
-    [HttpGet("{id:int}")]
-    public async Task<ActionResult<AppUser>> GetUser(int id)
+    [HttpPut]
+    public async Task<ActionResult> UpdateUser(MemberUpdateDto memberUpdateDto)
     {
-        var user = await userRepository.GetUserByIdAsync(id);
-        if(user == null) return NotFound();
-        return user;     
+        var username = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if(username == null) return BadRequest("No username found in token");
+
+        var user = await userRepository.GetUserByUsernameAsync(username);
+
+        if(user == null) return BadRequest("Could not find user");
+
+        mapper.Map(memberUpdateDto, user);
+
+        if(await userRepository.SaveAllAsync()) return NoContent();
+
+        return BadRequest("Failed to update the user");
     }
+
+    // [HttpGet("{id:int}")]
+    // public async Task<ActionResult<AppUser>> GetUser(int id)
+    // {
+    //     var user = await userRepository.GetUserByIdAsync(id);
+    //     if(user == null) return NotFound();
+    //     return user;     
+    // }
 }
